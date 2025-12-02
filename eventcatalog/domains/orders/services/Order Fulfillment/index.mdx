@@ -1,0 +1,26 @@
+---
+id: Order Fulfillment
+name: Order Fulfillment Service
+version: 1.0.0
+summary: >-
+  This service handles the logistics and processing required to fulfill customer
+  orders.
+badges: []
+sends:
+  - id: FulfillmentRequested
+    version: 1.0.0
+  - id: OrderShipped
+    version: 1.0.0
+  - id: OrderDelivered
+    version: 1.0.0
+receives:
+  - id: OrderCreated
+    version: 1.0.0
+schemaPath: order-fulfillment-service.yml
+specifications:
+  asyncapiPath: order-fulfillment-service.yml
+---
+This service handles the logistics and processing required to fulfill customer orders.  
+
+## Architecture diagram
+<NodeGraph />

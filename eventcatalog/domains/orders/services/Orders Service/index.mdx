@@ -1,0 +1,30 @@
+---
+id: Orders Service
+name: Orders Service
+version: 1.0.1
+summary: This service is in charge of processing orders
+badges: []
+sends:
+  - id: OrderCreated
+    version: 1.0.1
+  - id: OrderUpdated
+    version: 1.0.1
+  - id: OrderCancelled
+    version: 1.0.1
+  - id: OrderCompleted
+    version: 1.0.1
+receives:
+  - id: PaymentProcessed
+    version: 1.0.1
+  - id: InventoryReserved
+    version: 1.0.1
+  - id: ShipmentDelivered
+    version: 1.0.1
+schemaPath: orders-service.yml
+specifications:
+  asyncapiPath: orders-service.yml
+---
+This service is in charge of processing orders  
+
+## Architecture diagram
+<NodeGraph />

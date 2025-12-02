@@ -1,0 +1,28 @@
+---
+id: Inventory Service
+name: Inventory Service
+version: 1.0.0
+summary: >-
+  This service manages the inventory levels, reservations, and stock updates for
+  orders.
+badges: []
+sends:
+  - id: InventoryReserved
+    version: 1.0.0
+  - id: InventoryReleased
+    version: 1.0.0
+  - id: InventoryUpdated
+    version: 1.0.0
+receives:
+  - id: OrderCreated
+    version: 1.0.0
+  - id: OrderCancelled
+    version: 1.0.0
+schemaPath: inventory-service.yml
+specifications:
+  asyncapiPath: inventory-service.yml
+---
+This service manages the inventory levels, reservations, and stock updates for orders.  
+
+## Architecture diagram
+<NodeGraph />
