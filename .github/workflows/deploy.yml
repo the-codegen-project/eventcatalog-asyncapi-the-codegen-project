@@ -56,12 +56,6 @@ jobs:
         env:
           NODE_ENV: production
 
-      - name: Export static files
-        run: yarn export || echo "No export command, using build output"
-
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
-
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:

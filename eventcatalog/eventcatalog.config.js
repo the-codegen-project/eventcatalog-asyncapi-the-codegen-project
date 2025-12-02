@@ -11,12 +11,12 @@ export default {
   organizationName: 'OurLogix',
   homepageLink: 'https://eventcatalog.dev/',
   landingPage: '',
-  editUrl: 'https://github.com/boyney123/eventcatalog-demo/edit/master',
+  editUrl: 'https://github.com/the-codegen-project/eventcatalog-asyncapi-the-codegen-project/tree/main/eventcatalog',
   // By default set to false, add true to get urls ending in /
   trailingSlash: false,
   // Change to make the base url of the site different, by default https://{website}.com/docs,
   // changing to /company would be https://{website}.com/company/docs,
-  base: '/',
+  base: '/eventcatalog-asyncapi-the-codegen-project/',
   // Customize the logo, add your logo to public/ folder
   logo: {
     alt: 'EventCatalog Logo',
