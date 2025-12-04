@@ -1,7 +1,7 @@
 {
-  "name": "fraud-detection-service",
-  "version": "1.0.1",
-  "description": "This service monitors transactions to detect potentially fraudulent activities",
+  "name": "inventory-service",
+  "version": "1.0.0",
+  "description": "This service manages the inventory levels, reservations, and stock updates for orders",
   "main": "index.js",
   "license": "MIT",
   "scripts": {

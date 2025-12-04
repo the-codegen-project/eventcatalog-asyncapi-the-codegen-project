@@ -1,0 +1,19 @@
+{
+  "name": "user-simulator",
+  "version": "1.0.0",
+  "description": "Simulates user behavior across the system by publishing events to various services",
+  "main": "index.js",
+  "license": "MIT",
+  "scripts": {
+    "start": "ts-node src/index.ts"
+  },
+  "dependencies": {
+    "typescript": "^5.9.3",
+    "nats": "^2.29.3"
+  },
+  "devDependencies": {
+    "ts-node": "^10.9.2",
+    "@types/node": "^22.13.10"
+  }
+}
+
