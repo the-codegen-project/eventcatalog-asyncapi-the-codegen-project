@@ -1,0 +1,400 @@
+import { connect, NatsConnection, JSONCodec, Subscription } from 'nats';
+
+// ============================================================================
+// Type definitions based on AsyncAPI orders-service.yml specification
+// ============================================================================
+
+interface OrderItem {
+  itemId: string;
+  quantity: number;
+  price: number;
+}
+
+// Messages the Orders Service SENDS
+interface OrderCreated {
+  orderId: string;
+  userId: string;
+  totalAmount: number;
+  items: OrderItem[];
+}
+
+interface OrderCancelled {
+  orderId: string;
+  reason: string;
+}
+
+interface OrderCompleted {
+  orderId: string;
+  completionTime: string; // ISO 8601 date-time
+}
+
+// Messages the Orders Service RECEIVES
+interface PaymentFailed {
+  paymentId: string;
+  orderId: string;
+  failureReason: string;
+}
+
+interface ShipmentDelivered {
+  orderId: string;
+  shipmentId: string;
+  deliveryTime: string; // ISO 8601 date-time
+}
+
+// ============================================================================
+// Channel addresses (NATS subjects - using dots as per NATS convention)
+// Based on AsyncAPI spec addresses converted from slashes to dots
+// ============================================================================
+const CHANNELS = {
+  // Channels this service PUBLISHES to
+  ORDER_CANCELLED: 'order.cancelled',
+  ORDER_COMPLETED: 'order.completed',
+
+  // Channels this service SUBSCRIBES to
+  ORDER_CREATED: 'order.created',
+  PAYMENT_FAILED: 'payment.failed',
+  SHIPMENT_DELIVERED: 'shipment.delivered',
+} as const;
+
+// ============================================================================
+// Order state management
+// ============================================================================
+type OrderStatus = 'pending' | 'confirmed' | 'shipped' | 'delivered' | 'completed' | 'cancelled';
+
+interface Order {
+  orderId: string;
+  userId: string;
+  totalAmount: number;
+  items: OrderItem[];
+  status: OrderStatus;
+  createdAt: Date;
+}
+
+// ============================================================================
+// Orders Service Implementation
+// ============================================================================
+class OrdersService {
+  private nc: NatsConnection | null = null;
+  private jc = JSONCodec();
+  private subscriptions: Subscription[] = [];
+  private orders: Map<string, Order> = new Map();
+  private running = true;
+
+  async connect(natsUrl: string = 'nats://localhost:4222'): Promise<void> {
+    console.log(`🔌 Connecting to NATS at ${natsUrl}...`);
+    this.nc = await connect({ servers: natsUrl });
+    console.log(`✅ Connected to NATS server: ${this.nc.getServer()}`);
+  }
+
+  async disconnect(): Promise<void> {
+    this.running = false;
+    
+    // Unsubscribe from all subscriptions
+    for (const sub of this.subscriptions) {
+      sub.unsubscribe();
+    }
+    this.subscriptions = [];
+
+    if (this.nc) {
+      await this.nc.drain();
+      console.log('👋 Disconnected from NATS');
+    }
+  }
+
+  // =========================================================================
+  // Publishing operations (SEND)
+  // =========================================================================
+
+  /**
+   * sendOrderCancelled - Publishes OrderCancelled event
+   * Channel: order.cancelled
+   */
+  sendOrderCancelled(data: OrderCancelled): void {
+    if (!this.nc) throw new Error('Not connected to NATS');
+    
+    this.nc.publish(CHANNELS.ORDER_CANCELLED, this.jc.encode(data));
+    console.log(`📤 [${CHANNELS.ORDER_CANCELLED}] OrderCancelled sent:`, data);
+
+    // Update internal state
+    const order = this.orders.get(data.orderId);
+    if (order) {
+      order.status = 'cancelled';
+    }
+  }
+
+  /**
+   * sendOrderCompleted - Publishes OrderCompleted event
+   * Channel: order.completed
+   */
+  sendOrderCompleted(data: OrderCompleted): void {
+    if (!this.nc) throw new Error('Not connected to NATS');
+    
+    this.nc.publish(CHANNELS.ORDER_COMPLETED, this.jc.encode(data));
+    console.log(`📤 [${CHANNELS.ORDER_COMPLETED}] OrderCompleted sent:`, data);
+
+    // Update internal state
+    const order = this.orders.get(data.orderId);
+    if (order) {
+      order.status = 'completed';
+    }
+  }
+
+  // =========================================================================
+  // Subscription handlers (RECEIVE)
+  // =========================================================================
+
+  /**
+   * receiveOrderCreated - Subscribes to OrderCreated events
+   * Channel: order.created
+   * 
+   * When an order is created (by another service/frontend), track it internally
+   */
+  private async handleOrderCreated(data: OrderCreated): Promise<void> {
+    console.log(`📥 [${CHANNELS.ORDER_CREATED}] OrderCreated received:`, {
+      orderId: data.orderId,
+      userId: data.userId,
+      totalAmount: data.totalAmount,
+      itemCount: data.items.length,
+    });
+
+    // Check if we already have this order
+    if (this.orders.has(data.orderId)) {
+      console.log(`⚠️  Order ${data.orderId} already exists, ignoring duplicate`);
+      return;
+    }
+
+    // Track order internally
+    this.orders.set(data.orderId, {
+      ...data,
+      status: 'pending',
+      createdAt: new Date(),
+    });
+
+    console.log(`✅ Order ${data.orderId} registered - waiting for payment/shipment events`);
+  }
+
+  /**
+   * receivePaymentFailed - Subscribes to PaymentFailed events
+   * Channel: payment.failed
+   * 
+   * When payment fails, the order should be cancelled
+   */
+  private async handlePaymentFailed(data: PaymentFailed): Promise<void> {
+    console.log(`📥 [${CHANNELS.PAYMENT_FAILED}] PaymentFailed received:`, data);
+
+    const order = this.orders.get(data.orderId);
+    if (!order) {
+      console.log(`⚠️  Order ${data.orderId} not found, ignoring payment failure`);
+      return;
+    }
+
+    if (order.status === 'cancelled') {
+      console.log(`⚠️  Order ${data.orderId} already cancelled, ignoring`);
+      return;
+    }
+
+    // Cancel the order due to payment failure
+    console.log(`🚫 Cancelling order ${data.orderId} due to payment failure: ${data.failureReason}`);
+    this.sendOrderCancelled({
+      orderId: data.orderId,
+      reason: `Payment failed: ${data.failureReason}`,
+    });
+  }
+
+  /**
+   * receiveShipmentDelivered - Subscribes to ShipmentDelivered events
+   * Channel: shipment.delivered
+   * 
+   * When shipment is delivered, the order should be marked as completed
+   */
+  private async handleShipmentDelivered(data: ShipmentDelivered): Promise<void> {
+    console.log(`📥 [${CHANNELS.SHIPMENT_DELIVERED}] ShipmentDelivered received:`, data);
+
+    const order = this.orders.get(data.orderId);
+    if (!order) {
+      console.log(`⚠️  Order ${data.orderId} not found, ignoring shipment delivery`);
+      return;
+    }
+
+    if (order.status === 'cancelled') {
+      console.log(`⚠️  Order ${data.orderId} is cancelled, ignoring shipment delivery`);
+      return;
+    }
+
+    if (order.status === 'completed') {
+      console.log(`⚠️  Order ${data.orderId} already completed, ignoring`);
+      return;
+    }
+
+    // Mark order as completed
+    console.log(`✅ Completing order ${data.orderId} - shipment delivered at ${data.deliveryTime}`);
+    this.sendOrderCompleted({
+      orderId: data.orderId,
+      completionTime: new Date().toISOString(),
+    });
+  }
+
+  // =========================================================================
+  // Subscription setup
+  // =========================================================================
+
+  async setupSubscriptions(): Promise<void> {
+    if (!this.nc) throw new Error('Not connected to NATS');
+
+    // Subscribe to OrderCreated events
+    const orderCreatedSub = this.nc.subscribe(CHANNELS.ORDER_CREATED);
+    this.subscriptions.push(orderCreatedSub);
+    
+    (async () => {
+      for await (const msg of orderCreatedSub) {
+        try {
+          const data = this.jc.decode(msg.data) as OrderCreated;
+          await this.handleOrderCreated(data);
+        } catch (err) {
+          console.error(`❌ Error processing OrderCreated:`, err);
+        }
+      }
+    })();
+
+    console.log(`📬 Subscribed to: ${CHANNELS.ORDER_CREATED}`);
+
+    // Subscribe to PaymentFailed events
+    const paymentFailedSub = this.nc.subscribe(CHANNELS.PAYMENT_FAILED);
+    this.subscriptions.push(paymentFailedSub);
+    
+    (async () => {
+      for await (const msg of paymentFailedSub) {
+        try {
+          const data = this.jc.decode(msg.data) as PaymentFailed;
+          await this.handlePaymentFailed(data);
+        } catch (err) {
+          console.error(`❌ Error processing PaymentFailed:`, err);
+        }
+      }
+    })();
+
+    console.log(`📬 Subscribed to: ${CHANNELS.PAYMENT_FAILED}`);
+
+    // Subscribe to ShipmentDelivered events
+    const shipmentDeliveredSub = this.nc.subscribe(CHANNELS.SHIPMENT_DELIVERED);
+    this.subscriptions.push(shipmentDeliveredSub);
+    
+    (async () => {
+      for await (const msg of shipmentDeliveredSub) {
+        try {
+          const data = this.jc.decode(msg.data) as ShipmentDelivered;
+          await this.handleShipmentDelivered(data);
+        } catch (err) {
+          console.error(`❌ Error processing ShipmentDelivered:`, err);
+        }
+      }
+    })();
+
+    console.log(`📬 Subscribed to: ${CHANNELS.SHIPMENT_DELIVERED}`);
+  }
+
+  // =========================================================================
+  // Public API for order management
+  // =========================================================================
+
+  cancelOrder(orderId: string, reason: string): void {
+    const order = this.orders.get(orderId);
+    if (!order) {
+      console.log(`⚠️  Cannot cancel: Order ${orderId} not found`);
+      return;
+    }
+
+    if (order.status === 'cancelled') {
+      console.log(`⚠️  Order ${orderId} is already cancelled`);
+      return;
+    }
+
+    if (order.status === 'completed') {
+      console.log(`⚠️  Cannot cancel completed order ${orderId}`);
+      return;
+    }
+
+    this.sendOrderCancelled({ orderId, reason });
+  }
+
+  getOrder(orderId: string): Order | undefined {
+    return this.orders.get(orderId);
+  }
+
+  getOrderCount(): number {
+    return this.orders.size;
+  }
+
+  getOrdersByStatus(status: OrderStatus): Order[] {
+    return Array.from(this.orders.values()).filter(o => o.status === status);
+  }
+
+  // =========================================================================
+  // Service runner
+  // =========================================================================
+
+  async run(): Promise<void> {
+    console.log('\n' + '═'.repeat(60));
+    console.log('  📦 ORDERS SERVICE');
+    console.log('  Processing orders and orchestrating the order lifecycle');
+    console.log('═'.repeat(60));
+
+    console.log('\n📤 Publishing to channels:');
+    console.log(`   • ${CHANNELS.ORDER_CANCELLED}`);
+    console.log(`   • ${CHANNELS.ORDER_COMPLETED}`);
+
+    console.log('\n📥 Subscribing to channels:');
+    console.log(`   • ${CHANNELS.ORDER_CREATED}`);
+    console.log(`   • ${CHANNELS.PAYMENT_FAILED}`);
+    console.log(`   • ${CHANNELS.SHIPMENT_DELIVERED}`);
+
+    await this.setupSubscriptions();
+
+    console.log('\n✅ Orders Service is running. Waiting for events...');
+    console.log('   Press Ctrl+C to stop.\n');
+
+    // Keep the service running
+    while (this.running) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Periodic status report (every 30 seconds)
+      if (Date.now() % 30000 < 1000) {
+        const pending = this.getOrdersByStatus('pending').length;
+        const completed = this.getOrdersByStatus('completed').length;
+        const cancelled = this.getOrdersByStatus('cancelled').length;
+        console.log(`📊 Status: ${this.orders.size} total orders (${pending} pending, ${completed} completed, ${cancelled} cancelled)`);
+      }
+    }
+  }
+}
+
+// ============================================================================
+// Main entry point
+// ============================================================================
+async function main() {
+  const service = new OrdersService();
+  const natsUrl = process.env.NATS_URL || 'nats://localhost:4222';
+
+  try {
+    await service.connect(natsUrl);
+
+    // Handle graceful shutdown
+    const shutdown = async () => {
+      console.log('\n\n🛑 Shutting down Orders Service...');
+      await service.disconnect();
+      process.exit(0);
+    };
+
+    process.on('SIGINT', shutdown);
+    process.on('SIGTERM', shutdown);
+
+    await service.run();
+
+  } catch (err) {
+    console.error('❌ Failed to start Orders Service:', err);
+    process.exit(1);
+  }
+}
+
+main();
+
