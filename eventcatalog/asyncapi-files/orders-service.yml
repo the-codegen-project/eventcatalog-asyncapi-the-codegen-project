@@ -1,23 +1,16 @@
 asyncapi: 3.0.0
 info:
   title: Orders Service
-  version: 1.0.1
-  description: This service is in charge of processing orders
+  version: 1.0.0
+  description: This service is in charge of processing orders and orchestrating the order lifecycle.
 
 operations:
-  sendOrderCreated:
-    action: send
+  receiveOrderCreated:
+    action: receive
     channel:
       $ref: '#/channels/orderCreated'
     messages:
       - $ref: '#/channels/orderCreated/messages/OrderCreated'
-
-  sendOrderUpdated:
-    action: send
-    channel:
-      $ref: '#/channels/orderUpdated'
-    messages:
-      - $ref: '#/channels/orderUpdated/messages/OrderUpdated'
 
   sendOrderCancelled:
     action: send
@@ -33,19 +26,12 @@ operations:
     messages:
       - $ref: '#/channels/orderCompleted/messages/OrderCompleted'
 
-  receivePaymentProcessed:
+  receivePaymentFailed:
     action: receive
     channel:
-      $ref: '#/channels/paymentProcessed'
+      $ref: '#/channels/paymentFailed'
     messages:
-      - $ref: '#/channels/paymentProcessed/messages/PaymentProcessed'
-
-  receiveInventoryReserved:
-    action: receive
-    channel:
-      $ref: '#/channels/inventoryReserved'
-    messages:
-      - $ref: '#/channels/inventoryReserved/messages/InventoryReserved'
+      - $ref: '#/channels/paymentFailed/messages/PaymentFailed'
 
   receiveShipmentDelivered:
     action: receive
@@ -61,12 +47,6 @@ channels:
       OrderCreated:
         $ref: '#/components/messages/OrderCreated'
 
-  orderUpdated:
-    address: order/updated
-    messages:
-      OrderUpdated:
-        $ref: '#/components/messages/OrderUpdated'
-
   orderCancelled:
     address: order/cancelled
     messages:
@@ -79,17 +59,11 @@ channels:
       OrderCompleted:
         $ref: '#/components/messages/OrderCompleted'
 
-  paymentProcessed:
-    address: payment/processed
+  paymentFailed:
+    address: payment/failed
     messages:
-      PaymentProcessed:
-        $ref: '#/components/messages/PaymentProcessed'
-
-  inventoryReserved:
-    address: inventory/reserved
-    messages:
-      InventoryReserved:
-        $ref: '#/components/messages/InventoryReserved'
+      PaymentFailed:
+        $ref: '#/components/messages/PaymentFailed'
 
   shipmentDelivered:
     address: shipment/delivered
@@ -139,28 +113,6 @@ components:
                   format: float
                   description: Price of the item
 
-    OrderUpdated:
-      description: 'Event triggered when an order is updated'
-      x-eventcatalog-message-type: event
-      x-eventcatalog-draft: true
-      headers:
-        type: object
-        properties:
-          ec-message-type:
-            type: string
-            default: event
-            description: Type of message for EventCatalog
-      payload:
-        type: object
-        properties:
-          orderId:
-            type: string
-            description: Unique identifier for the order
-          updatedFields:
-            type: object
-            description: Fields that were updated in the order
-            additionalProperties: true
-
     OrderCancelled:
       description: 'Event triggered when an order is cancelled'
       x-eventcatalog-message-type: event
@@ -202,8 +154,8 @@ components:
             format: date-time
             description: Time when the order was completed
 
-    PaymentProcessed:
-      description: 'Event triggered when a payment is processed'
+    PaymentFailed:
+      description: 'Event received when a payment fails'
       x-eventcatalog-message-type: event
       headers:
         type: object
@@ -215,43 +167,19 @@ components:
       payload:
         type: object
         properties:
-          orderId:
-            type: string
-            description: Unique identifier for the order
           paymentId:
             type: string
             description: Unique identifier for the payment
-          status:
-            type: string
-            description: Status of the payment
-
-    InventoryReserved:
-      description: 'Event triggered when inventory is reserved for an order'
-      x-eventcatalog-message-type: event
-      headers:
-        type: object
-        properties:
-          ec-message-type:
-            type: string
-            default: event
-            description: Type of message for EventCatalog
-      payload:
-        type: object
-        properties:
           orderId:
             type: string
-            description: Unique identifier for the order
-          reservationId:
+            description: Unique identifier for the related order
+          failureReason:
             type: string
-            description: Unique identifier for the inventory reservation
-          status:
-            type: string
-            description: Status of the inventory reservation
+            description: Reason for the payment failure
 
     ShipmentDelivered:
-      description: 'Event triggered when a shipment is delivered'
+      description: 'Event received when a shipment is delivered'
       x-eventcatalog-message-type: event
-      x-eventcatalog-draft: true
       headers:
         type: object
         properties:

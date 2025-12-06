@@ -31,31 +31,16 @@ interface InventoryReserved {
 }
 
 // Payment Service messages
-interface TransactionVerified {
-  transactionId: string;
-  verificationTime: string;
-  status: string;
-}
-
 interface PaymentProcessed {
   orderId: string;
   paymentId: string;
   status: string;
 }
 
-// Fraud Detection messages
-interface TransactionEvaluated {
-  transactionId: string;
-  evaluationTime: string;
-  isFraudulent: boolean;
-  riskScore: number;
-}
-
-interface TransactionReview {
-  transactionId: string;
-  reviewTime: string;
-  reviewOutcome: string;
-  reviewerId: string;
+interface PaymentFailed {
+  paymentId: string;
+  orderId: string;
+  failureReason: string;
 }
 
 // Shipment messages
@@ -69,20 +54,18 @@ interface ShipmentDelivered {
 // Channel addresses (using dots for NATS subject format)
 // ============================================================================
 const CHANNELS = {
-  // Messages that trigger inventory & fulfillment services
+  // Orders Service channels
   ORDER_CREATED: 'order.created',
   ORDER_CANCELLED: 'order.cancelled',
   
-  // Messages that trigger fraud detection service
-  TRANSACTION_EVALUATED: 'transaction.evaluated',
-  TRANSACTION_REVIEW: 'transaction.review',
-  
-  // Messages that trigger payment service
-  TRANSACTION_VERIFIED: 'transaction.verified',
-  
-  // Messages that trigger orders service
+  // Payment Service channels
   PAYMENT_PROCESSED: 'payment.processed',
+  PAYMENT_FAILED: 'payment.failed',
+  
+  // Inventory Service channels
   INVENTORY_RESERVED: 'inventory.reserved',
+  
+  // Fulfillment Service channels
   SHIPMENT_DELIVERED: 'shipment.delivered',
 };
 
@@ -99,8 +82,6 @@ const SAMPLE_ITEMS = [
 ];
 
 const SAMPLE_USERS = ['user-001', 'user-002', 'user-003', 'user-004', 'user-005'];
-const REVIEWERS = ['reviewer-001', 'reviewer-002', 'reviewer-003'];
-const REVIEW_OUTCOMES = ['Approved', 'Declined', 'Escalated'];
 const CANCEL_REASONS = [
   'Customer requested cancellation',
   'Payment declined',
@@ -163,10 +144,8 @@ class UserSimulator {
    * Simulate a complete order flow:
    * 1. Create order
    * 2. Reserve inventory
-   * 3. Evaluate transaction for fraud
-   * 4. Verify transaction
-   * 5. Process payment
-   * 6. Deliver shipment
+   * 3. Process payment
+   * 4. Deliver shipment
    */
   async simulateOrderFlow(): Promise<void> {
     const orderId = generateId('ORD');
@@ -208,59 +187,31 @@ class UserSimulator {
     
     await sleep(300);
 
-    // Step 3: Evaluate transaction for fraud
-    const transactionId = generateId('TXN');
-    const riskScore = Math.random();
-    const transactionEvaluated: TransactionEvaluated = {
-      transactionId,
-      evaluationTime: new Date().toISOString(),
-      isFraudulent: riskScore > 0.85,
-      riskScore,
-    };
-    console.log(`🔍 Transaction ${transactionId} evaluated - Risk: ${(riskScore * 100).toFixed(1)}%`);
-    this.publish(CHANNELS.TRANSACTION_EVALUATED, transactionEvaluated);
-
-    // If flagged, sometimes trigger manual review
-    if (riskScore > 0.7 && Math.random() > 0.5) {
-      await sleep(200);
-      const review: TransactionReview = {
-        transactionId,
-        reviewTime: new Date().toISOString(),
-        reviewOutcome: randomElement(REVIEW_OUTCOMES),
-        reviewerId: randomElement(REVIEWERS),
+    // Step 3: Process payment (with occasional failure)
+    const paymentId = generateId('PAY');
+    const paymentFails = Math.random() > 0.9; // 10% chance of payment failure
+    
+    if (paymentFails) {
+      const paymentFailed: PaymentFailed = {
+        paymentId,
+        orderId,
+        failureReason: 'Insufficient funds',
       };
-      console.log(`👤 Manual review for ${transactionId}: ${review.reviewOutcome}`);
-      this.publish(CHANNELS.TRANSACTION_REVIEW, review);
-    }
-
-    await sleep(400);
-
-    // Step 4: Verify transaction
-    const transactionVerified: TransactionVerified = {
-      transactionId,
-      verificationTime: new Date().toISOString(),
-      status: riskScore > 0.9 ? 'rejected' : 'verified',
-    };
-    console.log(`✔️  Transaction ${transactionId} verification: ${transactionVerified.status}`);
-    this.publish(CHANNELS.TRANSACTION_VERIFIED, transactionVerified);
-
-    if (transactionVerified.status === 'rejected') {
-      // Cancel the order if transaction rejected
+      console.log(`❌ Payment ${paymentId} failed for order ${orderId}`);
+      this.publish(CHANNELS.PAYMENT_FAILED, paymentFailed);
+      
+      // Cancel the order due to payment failure
       await sleep(200);
       const cancelled: OrderCancelled = {
         orderId,
-        reason: 'Transaction verification failed',
+        reason: 'Payment failed',
       };
-      console.log(`❌ Order ${orderId} cancelled: ${cancelled.reason}`);
+      console.log(`🚫 Order ${orderId} cancelled: ${cancelled.reason}`);
       this.publish(CHANNELS.ORDER_CANCELLED, cancelled);
       this.activeOrders.delete(orderId);
       return;
     }
 
-    await sleep(300);
-
-    // Step 5: Process payment
-    const paymentId = generateId('PAY');
     const paymentProcessed: PaymentProcessed = {
       orderId,
       paymentId,
@@ -271,7 +222,7 @@ class UserSimulator {
 
     await sleep(500);
 
-    // Step 6: Simulate shipment delivery
+    // Step 4: Simulate shipment delivery
     const shipmentId = generateId('SHIP');
     const shipmentDelivered: ShipmentDelivered = {
       orderId,
@@ -305,35 +256,6 @@ class UserSimulator {
   }
 
   /**
-   * Simulate a suspicious transaction for fraud detection
-   */
-  async simulateSuspiciousActivity(): Promise<void> {
-    const transactionId = generateId('SUSPICIOUS-TXN');
-    
-    const transactionEvaluated: TransactionEvaluated = {
-      transactionId,
-      evaluationTime: new Date().toISOString(),
-      isFraudulent: true,
-      riskScore: 0.95 + Math.random() * 0.05, // 95-100% risk
-    };
-    
-    console.log(`\n🚨 Suspicious transaction ${transactionId} - Risk: ${(transactionEvaluated.riskScore * 100).toFixed(1)}%`);
-    this.publish(CHANNELS.TRANSACTION_EVALUATED, transactionEvaluated);
-    
-    await sleep(300);
-    
-    // Always trigger manual review for suspicious activity
-    const review: TransactionReview = {
-      transactionId,
-      reviewTime: new Date().toISOString(),
-      reviewOutcome: 'Escalated',
-      reviewerId: randomElement(REVIEWERS),
-    };
-    console.log(`👮 Escalating suspicious transaction ${transactionId}`);
-    this.publish(CHANNELS.TRANSACTION_REVIEW, review);
-  }
-
-  /**
    * Main simulation loop
    */
   async runSimulation(): Promise<void> {
@@ -344,18 +266,15 @@ class UserSimulator {
     
     while (this.running) {
       try {
-        // 70% chance: Normal order flow
-        // 15% chance: Cancel an existing order
-        // 15% chance: Suspicious activity
+        // 80% chance: Normal order flow
+        // 20% chance: Cancel an existing order
         const action = Math.random();
         
-        if (action < 0.70) {
+        if (action < 0.80) {
           await this.simulateOrderFlow();
           orderCount++;
-        } else if (action < 0.85) {
-          await this.simulateOrderCancellation();
         } else {
-          await this.simulateSuspiciousActivity();
+          await this.simulateOrderCancellation();
         }
         
         // Wait between 2-5 seconds between actions
@@ -383,7 +302,7 @@ async function main() {
 
     console.log('\n' + '═'.repeat(50));
     console.log('  🧪 USER BEHAVIOR SIMULATOR');
-    console.log('  Simulates orders, payments, fraud detection, etc.');
+    console.log('  Simulates orders, payments, inventory, and shipments');
     console.log('═'.repeat(50));
     console.log('\nChannels being published to:');
     Object.entries(CHANNELS).forEach(([key, channel]) => {

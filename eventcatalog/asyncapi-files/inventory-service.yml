@@ -158,14 +158,14 @@ components:
             description: Updated quantity of the item in inventory
 
     OrderCreated:
-      description: 'Command received when a new order is created, triggering inventory reservation'
-      x-eventcatalog-message-type: command
+      description: 'Event received when a new order is created, triggering inventory reservation'
+      x-eventcatalog-message-type: event
       headers:
         type: object
         properties:
           ec-message-type:
             type: string
-            default: command
+            default: event
             description: Type of message for EventCatalog
       payload:
         type: object
@@ -187,14 +187,14 @@ components:
                   description: Quantity of the item ordered
 
     OrderCancelled:
-      description: 'Command received when an order is cancelled, triggering inventory release'
-      x-eventcatalog-message-type: command
+      description: 'Event received when an order is cancelled, triggering inventory release'
+      x-eventcatalog-message-type: event
       headers:
         type: object
         properties:
           ec-message-type:
             type: string
-            default: command
+            default: event
             description: Type of message for EventCatalog
       payload:
         type: object

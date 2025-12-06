@@ -1,23 +1,54 @@
 asyncapi: 3.0.0
 info:
-  title: USService
-  description: description
-  version: 1.1.0
+  title: User Service
+  version: 1.0.0
+  description: This service manages user accounts and authentication.
 
-channels:
-  randomChannel:
-    address: myAddress
-    messages:
-      UserSignup:
-        $ref: '#/components/schemas/UserSignedUp/schema'
 operations:
-  sendNoise:
+  sendUserSignedUp:
     action: send
     channel:
-      $ref: '#/channels/randomChannel'
+      $ref: '#/channels/userSignedUp'
+    messages:
+      - $ref: '#/channels/userSignedUp/messages/UserSignedUp'
+
+channels:
+  userSignedUp:
+    address: user/signedup
+    messages:
+      UserSignedUp:
+        $ref: '#/components/messages/UserSignedUp'
+
 components:
-  schemas:
+  messages:
     UserSignedUp:
-      schemaFormat: 'application/schema+json;version=draft-07'
-      schema:
-        '$ref': './user-signed-up.yml#/UserSignedUp'
+      description: 'Event triggered when a new user signs up'
+      x-eventcatalog-message-type: event
+      headers:
+        type: object
+        properties:
+          ec-message-type:
+            type: string
+            default: event
+            description: Type of message for EventCatalog
+      payload:
+        type: object
+        properties:
+          userId:
+            type: string
+            description: Unique identifier for the user
+          fullName:
+            type: string
+            description: The full name of the user
+          email:
+            type: string
+            format: email
+            description: User's email address
+          signupTime:
+            type: string
+            format: date-time
+            description: Time when the user signed up
+        required:
+          - userId
+          - fullName
+          - email

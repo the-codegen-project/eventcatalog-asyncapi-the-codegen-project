@@ -38,7 +38,7 @@ export default {
           { path: path.join(__dirname, 'asyncapi-files', 'order-fulfillment-service.yml'), id: 'Order Fulfillment' },
           { path: path.join(__dirname, 'asyncapi-files', 'inventory-service.yml'), id: 'Inventory Service' },
         ],
-        domain: { id: 'orders', name: 'Orders', version: '0.0.1' },
+        domain: { id: 'orders', name: 'Orders', version: '1.0.0' },
       },
     ],
     [
@@ -46,9 +46,8 @@ export default {
       {
         services: [
           { path: path.join(__dirname, 'asyncapi-files', 'payment-service.yml'), id: 'Payment Service' },
-          { path: path.join(__dirname, 'asyncapi-files', 'fraud-detection-service.yml'), id: 'Fraud Detection' },
         ],
-        domain: { id: 'payment', name: 'Payment', version: '0.0.1' },
+        domain: { id: 'payment', name: 'Payment', version: '1.0.0' },
       },
     ],
     [
@@ -57,7 +56,7 @@ export default {
         services: [
           { path: path.join(__dirname, 'asyncapi-files', 'user-service.yml'), id: 'User Service' },
         ],
-        domain: { id: 'user-domain', name: 'User Domain', version: '0.0.1' },
+        domain: { id: 'user-domain', name: 'User Domain', version: '1.0.0' },
         debug: true
       },
     ],
