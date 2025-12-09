@@ -14,7 +14,7 @@ operations:
 
 channels:
   userSignedUp:
-    address: user/signedup
+    address: user.signedup
     messages:
       UserSignedUp:
         $ref: '#/components/messages/UserSignedUp'

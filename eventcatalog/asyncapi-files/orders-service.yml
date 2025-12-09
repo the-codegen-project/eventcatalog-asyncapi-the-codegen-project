@@ -42,36 +42,50 @@ operations:
 
 channels:
   orderCreated:
-    address: order/created
+    address: order.created
     messages:
       OrderCreated:
         $ref: '#/components/messages/OrderCreated'
 
   orderCancelled:
-    address: order/cancelled
+    address: order.cancelled
     messages:
       OrderCancelled:
         $ref: '#/components/messages/OrderCancelled'
 
   orderCompleted:
-    address: order/completed
+    address: order.completed
     messages:
       OrderCompleted:
         $ref: '#/components/messages/OrderCompleted'
 
   paymentFailed:
-    address: payment/failed
+    address: payment.failed
     messages:
       PaymentFailed:
         $ref: '#/components/messages/PaymentFailed'
 
   shipmentDelivered:
-    address: shipment/delivered
+    address: shipment.delivered
     messages:
       ShipmentDelivered:
         $ref: '#/components/messages/ShipmentDelivered'
 
 components:
+  schemas:
+    OrderItem:
+      type: object
+      properties:
+        itemId:
+          type: string
+          description: Unique identifier for the item
+        quantity:
+          type: integer
+          description: Quantity of the item ordered
+        price:
+          type: number
+          format: float
+          description: Price of the item
   messages:
     OrderCreated:
       description: 'Event triggered when an order is created'
@@ -100,18 +114,7 @@ components:
             type: array
             description: List of items in the order
             items:
-              type: object
-              properties:
-                itemId:
-                  type: string
-                  description: Unique identifier for the item
-                quantity:
-                  type: integer
-                  description: Quantity of the item ordered
-                price:
-                  type: number
-                  format: float
-                  description: Price of the item
+              $ref: '#/components/schemas/OrderItem'
 
     OrderCancelled:
       description: 'Event triggered when an order is cancelled'

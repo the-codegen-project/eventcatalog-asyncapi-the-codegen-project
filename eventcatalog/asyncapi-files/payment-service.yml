@@ -42,31 +42,31 @@ operations:
 
 channels:
   orderCreated:
-    address: order/created
+    address: order.created
     messages:
       OrderCreated:
         $ref: '#/components/messages/OrderCreated'
 
   paymentProcessed:
-    address: payment/processed
+    address: payment.processed
     messages:
       PaymentProcessed:
         $ref: '#/components/messages/PaymentProcessed'
 
   paymentFailed:
-    address: payment/failed
+    address: payment.failed
     messages:
       PaymentFailed:
         $ref: '#/components/messages/PaymentFailed'
 
   orderCancelled:
-    address: order/cancelled
+    address: order.cancelled
     messages:
       OrderCancelled:
         $ref: '#/components/messages/OrderCancelled'
 
   refundInitiated:
-    address: refund/initiated
+    address: refund.initiated
     messages:
       RefundInitiated:
         $ref: '#/components/messages/RefundInitiated'

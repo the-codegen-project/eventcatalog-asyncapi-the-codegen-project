@@ -42,18 +42,17 @@ interface ShipmentDelivered {
 }
 
 // ============================================================================
-// Channel addresses (NATS subjects - using dots as per NATS convention)
-// Based on AsyncAPI spec addresses converted from slashes to dots
+// Channels (keys are AsyncAPI channel IDs, values are NATS subjects)
 // ============================================================================
 const CHANNELS = {
   // Channels this service PUBLISHES to
-  ORDER_CANCELLED: 'order.cancelled',
-  ORDER_COMPLETED: 'order.completed',
+  orderCancelled: 'order.cancelled',
+  orderCompleted: 'order.completed',
 
   // Channels this service SUBSCRIBES to
-  ORDER_CREATED: 'order.created',
-  PAYMENT_FAILED: 'payment.failed',
-  SHIPMENT_DELIVERED: 'shipment.delivered',
+  orderCreated: 'order.created',
+  paymentFailed: 'payment.failed',
+  shipmentDelivered: 'shipment.delivered',
 } as const;
 
 // ============================================================================
@@ -112,8 +111,8 @@ class OrdersService {
   sendOrderCancelled(data: OrderCancelled): void {
     if (!this.nc) throw new Error('Not connected to NATS');
     
-    this.nc.publish(CHANNELS.ORDER_CANCELLED, this.jc.encode(data));
-    console.log(`📤 [${CHANNELS.ORDER_CANCELLED}] OrderCancelled sent:`, data);
+    this.nc.publish(CHANNELS.orderCancelled, this.jc.encode(data));
+    console.log(`📤 [${CHANNELS.orderCancelled}] OrderCancelled sent:`, data);
 
     // Update internal state
     const order = this.orders.get(data.orderId);
@@ -129,8 +128,8 @@ class OrdersService {
   sendOrderCompleted(data: OrderCompleted): void {
     if (!this.nc) throw new Error('Not connected to NATS');
     
-    this.nc.publish(CHANNELS.ORDER_COMPLETED, this.jc.encode(data));
-    console.log(`📤 [${CHANNELS.ORDER_COMPLETED}] OrderCompleted sent:`, data);
+    this.nc.publish(CHANNELS.orderCompleted, this.jc.encode(data));
+    console.log(`📤 OrderCompleted sent:`, data);
 
     // Update internal state
     const order = this.orders.get(data.orderId);
@@ -150,7 +149,7 @@ class OrdersService {
    * When an order is created (by another service/frontend), track it internally
    */
   private async handleOrderCreated(data: OrderCreated): Promise<void> {
-    console.log(`📥 [${CHANNELS.ORDER_CREATED}] OrderCreated received:`, {
+    console.log(`📥 [${CHANNELS.orderCreated}] OrderCreated received:`, {
       orderId: data.orderId,
       userId: data.userId,
       totalAmount: data.totalAmount,
@@ -180,7 +179,7 @@ class OrdersService {
    * When payment fails, the order should be cancelled
    */
   private async handlePaymentFailed(data: PaymentFailed): Promise<void> {
-    console.log(`📥 [${CHANNELS.PAYMENT_FAILED}] PaymentFailed received:`, data);
+    console.log(`📥 [${CHANNELS.paymentFailed}] PaymentFailed received:`, data);
 
     const order = this.orders.get(data.orderId);
     if (!order) {
@@ -208,7 +207,7 @@ class OrdersService {
    * When shipment is delivered, the order should be marked as completed
    */
   private async handleShipmentDelivered(data: ShipmentDelivered): Promise<void> {
-    console.log(`📥 [${CHANNELS.SHIPMENT_DELIVERED}] ShipmentDelivered received:`, data);
+    console.log(`📥 [${CHANNELS.shipmentDelivered}] ShipmentDelivered received:`, data);
 
     const order = this.orders.get(data.orderId);
     if (!order) {
@@ -242,7 +241,7 @@ class OrdersService {
     if (!this.nc) throw new Error('Not connected to NATS');
 
     // Subscribe to OrderCreated events
-    const orderCreatedSub = this.nc.subscribe(CHANNELS.ORDER_CREATED);
+    const orderCreatedSub = this.nc.subscribe(CHANNELS.orderCreated);
     this.subscriptions.push(orderCreatedSub);
     
     (async () => {
@@ -256,10 +255,10 @@ class OrdersService {
       }
     })();
 
-    console.log(`📬 Subscribed to: ${CHANNELS.ORDER_CREATED}`);
+    console.log(`📬 Subscribed to: ${CHANNELS.orderCreated}`);
 
     // Subscribe to PaymentFailed events
-    const paymentFailedSub = this.nc.subscribe(CHANNELS.PAYMENT_FAILED);
+    const paymentFailedSub = this.nc.subscribe(CHANNELS.paymentFailed);
     this.subscriptions.push(paymentFailedSub);
     
     (async () => {
@@ -273,10 +272,10 @@ class OrdersService {
       }
     })();
 
-    console.log(`📬 Subscribed to: ${CHANNELS.PAYMENT_FAILED}`);
+    console.log(`📬 Subscribed to: ${CHANNELS.paymentFailed}`);
 
     // Subscribe to ShipmentDelivered events
-    const shipmentDeliveredSub = this.nc.subscribe(CHANNELS.SHIPMENT_DELIVERED);
+    const shipmentDeliveredSub = this.nc.subscribe(CHANNELS.shipmentDelivered);
     this.subscriptions.push(shipmentDeliveredSub);
     
     (async () => {
@@ -290,7 +289,7 @@ class OrdersService {
       }
     })();
 
-    console.log(`📬 Subscribed to: ${CHANNELS.SHIPMENT_DELIVERED}`);
+    console.log(`📬 Subscribed to: ${CHANNELS.shipmentDelivered}`);
   }
 
   // =========================================================================
@@ -340,13 +339,13 @@ class OrdersService {
     console.log('═'.repeat(60));
 
     console.log('\n📤 Publishing to channels:');
-    console.log(`   • ${CHANNELS.ORDER_CANCELLED}`);
-    console.log(`   • ${CHANNELS.ORDER_COMPLETED}`);
+    console.log(`   • ${CHANNELS.orderCancelled}`);
+    console.log(`   • ${CHANNELS.orderCompleted}`);
 
     console.log('\n📥 Subscribing to channels:');
-    console.log(`   • ${CHANNELS.ORDER_CREATED}`);
-    console.log(`   • ${CHANNELS.PAYMENT_FAILED}`);
-    console.log(`   • ${CHANNELS.SHIPMENT_DELIVERED}`);
+    console.log(`   • ${CHANNELS.orderCreated}`);
+    console.log(`   • ${CHANNELS.paymentFailed}`);
+    console.log(`   • ${CHANNELS.shipmentDelivered}`);
 
     await this.setupSubscriptions();
 

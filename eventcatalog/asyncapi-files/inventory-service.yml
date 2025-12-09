@@ -42,31 +42,31 @@ operations:
 
 channels:
   inventoryReserved:
-    address: inventory/reserved
+    address: inventory.reserved
     messages:
       InventoryReserved:
         $ref: '#/components/messages/InventoryReserved'
 
   inventoryReleased:
-    address: inventory/released
+    address: inventory.released
     messages:
       InventoryReleased:
         $ref: '#/components/messages/InventoryReleased'
 
   inventoryUpdated:
-    address: inventory/updated
+    address: inventory.updated
     messages:
       InventoryUpdated:
         $ref: '#/components/messages/InventoryUpdated'
 
   orderCreated:
-    address: order/created
+    address: order.created
     messages:
       OrderCreated:
         $ref: '#/components/messages/OrderCreated'
 
   orderCancelled:
-    address: order/cancelled
+    address: order.cancelled
     messages:
       OrderCancelled:
         $ref: '#/components/messages/OrderCancelled'
