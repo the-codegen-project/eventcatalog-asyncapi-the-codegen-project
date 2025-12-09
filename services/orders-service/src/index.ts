@@ -4,53 +4,134 @@ import { connect, NatsConnection, JSONCodec, Subscription } from 'nats';
 // Type definitions based on AsyncAPI orders-service.yml specification
 // ============================================================================
 
-class OrderItem {
-  constructor(
-    public itemId: string,
-    public quantity: number,
-    public price: number
-  ) {}
+interface OrderCreatedItemProps {
+  itemId: string;
+  quantity: number;
+  price: number;
+}
+
+class OrderCreatedItem {
+  private _itemId: string;
+  private _quantity: number;
+  private _price: number;
+
+  constructor(props: OrderCreatedItemProps) {
+    this._itemId = props.itemId;
+    this._quantity = props.quantity;
+    this._price = props.price;
+  }
+
+  get itemId(): string { return this._itemId; }
+  get quantity(): number { return this._quantity; }
+  get price(): number { return this._price; }
 }
 
 // Messages the Orders Service SENDS
+interface OrderCreatedProps {
+  orderId: string;
+  userId: string;
+  totalAmount: number;
+  items: OrderCreatedItem[];
+}
+
 class OrderCreated {
-  constructor(
-    public orderId: string,
-    public userId: string,
-    public totalAmount: number,
-    public items: OrderItem[]
-  ) {}
+  private _orderId: string;
+  private _userId: string;
+  private _totalAmount: number;
+  private _items: OrderCreatedItem[];
+
+  constructor(props: OrderCreatedProps) {
+    this._orderId = props.orderId;
+    this._userId = props.userId;
+    this._totalAmount = props.totalAmount;
+    this._items = props.items;
+  }
+
+  get orderId(): string { return this._orderId; }
+  get userId(): string { return this._userId; }
+  get totalAmount(): number { return this._totalAmount; }
+  get items(): OrderCreatedItem[] { return this._items; }
+}
+
+interface OrderCancelledProps {
+  orderId: string;
+  reason: string;
 }
 
 class OrderCancelled {
-  constructor(
-    public orderId: string,
-    public reason: string
-  ) {}
+  private _orderId: string;
+  private _reason: string;
+
+  constructor(props: OrderCancelledProps) {
+    this._orderId = props.orderId;
+    this._reason = props.reason;
+  }
+
+  get orderId(): string { return this._orderId; }
+  get reason(): string { return this._reason; }
+}
+
+interface OrderCompletedProps {
+  orderId: string;
+  completionTime: string; // ISO 8601 date-time
 }
 
 class OrderCompleted {
-  constructor(
-    public orderId: string,
-    public completionTime: string // ISO 8601 date-time
-  ) {}
+  private _orderId: string;
+  private _completionTime: string;
+
+  constructor(props: OrderCompletedProps) {
+    this._orderId = props.orderId;
+    this._completionTime = props.completionTime;
+  }
+
+  get orderId(): string { return this._orderId; }
+  get completionTime(): string { return this._completionTime; }
 }
 
 // Messages the Orders Service RECEIVES
+interface PaymentFailedProps {
+  paymentId: string;
+  orderId: string;
+  failureReason: string;
+}
+
 class PaymentFailed {
-  constructor(
-    public paymentId: string,
-    public orderId: string,
-    public failureReason: string
-  ) {}
+  private _paymentId: string;
+  private _orderId: string;
+  private _failureReason: string;
+
+  constructor(props: PaymentFailedProps) {
+    this._paymentId = props.paymentId;
+    this._orderId = props.orderId;
+    this._failureReason = props.failureReason;
+  }
+
+  get paymentId(): string { return this._paymentId; }
+  get orderId(): string { return this._orderId; }
+  get failureReason(): string { return this._failureReason; }
+}
+
+interface ShipmentDeliveredProps {
+  orderId: string;
+  shipmentId: string;
+  deliveryTime: string; // ISO 8601 date-time
 }
 
 class ShipmentDelivered {
-  constructor(
-    public orderId: string,
-    public shipmentId: string,
-    public deliveryTime: string // ISO 8601 date-time
-  ) {}
+  private _orderId: string;
+  private _shipmentId: string;
+  private _deliveryTime: string;
+
+  constructor(props: ShipmentDeliveredProps) {
+    this._orderId = props.orderId;
+    this._shipmentId = props.shipmentId;
+    this._deliveryTime = props.deliveryTime;
+  }
+
+  get orderId(): string { return this._orderId; }
+  get shipmentId(): string { return this._shipmentId; }
+  get deliveryTime(): string { return this._deliveryTime; }
 }
 
 // ============================================================================
@@ -71,6 +152,12 @@ const CHANNELS = {
 // Order state management
 // ============================================================================
 type OrderStatus = 'pending' | 'confirmed' | 'shipped' | 'delivered' | 'completed' | 'cancelled';
+
+interface OrderItem {
+  itemId: string,
+  quantity: number,
+  price: number
+}
 
 interface Order {
   orderId: string;
@@ -176,7 +263,10 @@ class OrdersService {
 
     // Track order internally
     this.orders.set(data.orderId, {
-      ...data,
+      orderId: data.orderId,
+      userId: data.userId,
+      totalAmount: data.totalAmount,
+      items: data.items,
       status: 'pending',
       createdAt: new Date(),
     });
@@ -206,10 +296,10 @@ class OrdersService {
 
     // Cancel the order due to payment failure
     console.log(`🚫 Cancelling order ${data.orderId} due to payment failure: ${data.failureReason}`);
-    this.sendOrderCancelled({
+    this.sendOrderCancelled(new OrderCancelled({
       orderId: data.orderId,
       reason: `Payment failed: ${data.failureReason}`,
-    });
+    }));
   }
 
   /**
@@ -239,10 +329,10 @@ class OrdersService {
 
     // Mark order as completed
     console.log(`✅ Completing order ${data.orderId} - shipment delivered at ${data.deliveryTime}`);
-    this.sendOrderCompleted({
+    this.sendOrderCompleted(new OrderCompleted({
       orderId: data.orderId,
       completionTime: new Date().toISOString(),
-    });
+    }));
   }
 
   // =========================================================================
@@ -325,7 +415,7 @@ class OrdersService {
       return;
     }
 
-    this.sendOrderCancelled({ orderId, reason });
+    this.sendOrderCancelled(new OrderCancelled({ orderId, reason }));
   }
 
   getOrder(orderId: string): Order | undefined {

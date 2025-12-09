@@ -83,6 +83,7 @@ components:
             type: string
             default: event
             description: Type of message for EventCatalog
+        additionalProperties: false
       payload:
         type: object
         properties:
@@ -104,6 +105,8 @@ components:
                 quantity:
                   type: integer
                   description: Quantity of the item reserved
+              additionalProperties: false
+        additionalProperties: false
 
     InventoryReleased:
       description: 'Event triggered when reserved inventory is released due to order cancellation or expiration'
@@ -115,6 +118,7 @@ components:
             type: string
             default: event
             description: Type of message for EventCatalog
+        additionalProperties: false
       payload:
         type: object
         properties:
@@ -136,6 +140,8 @@ components:
                 quantity:
                   type: integer
                   description: Quantity of the item released
+              additionalProperties: false
+        additionalProperties: false
 
     InventoryUpdated:
       description: 'Event triggered when inventory levels are updated due to restocking or sales'
@@ -147,6 +153,7 @@ components:
             type: string
             default: event
             description: Type of message for EventCatalog
+        additionalProperties: false
       payload:
         type: object
         properties:
@@ -156,6 +163,7 @@ components:
           newQuantity:
             type: integer
             description: Updated quantity of the item in inventory
+        additionalProperties: false
 
     OrderCreated:
       description: 'Event received when a new order is created, triggering inventory reservation'
@@ -167,6 +175,7 @@ components:
             type: string
             default: event
             description: Type of message for EventCatalog
+        additionalProperties: false
       payload:
         type: object
         properties:
@@ -185,6 +194,8 @@ components:
                 quantity:
                   type: integer
                   description: Quantity of the item ordered
+              additionalProperties: false
+        additionalProperties: false
 
     OrderCancelled:
       description: 'Event received when an order is cancelled, triggering inventory release'
@@ -196,6 +207,7 @@ components:
             type: string
             default: event
             description: Type of message for EventCatalog
+        additionalProperties: false
       payload:
         type: object
         properties:
@@ -214,3 +226,5 @@ components:
                 quantity:
                   type: integer
                   description: Quantity of the item ordered
+              additionalProperties: false
+        additionalProperties: false

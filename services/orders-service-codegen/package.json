@@ -13,7 +13,7 @@
     "nats": "^2.29.3"
   },
   "devDependencies": {
-    "@the-codegen-project/cli": "^0.56.0",
+    "@the-codegen-project/cli": "^0.57.0",
     "ts-node": "^10.9.2",
     "@types/node": "^22.13.10"
   }

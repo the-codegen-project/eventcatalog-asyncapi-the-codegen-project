@@ -31,6 +31,7 @@ components:
             type: string
             default: event
             description: Type of message for EventCatalog
+        additionalProperties: false
       payload:
         type: object
         properties:
@@ -52,3 +53,4 @@ components:
           - userId
           - fullName
           - email
+        additionalProperties: false

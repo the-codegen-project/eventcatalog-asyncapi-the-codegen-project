@@ -83,6 +83,7 @@ components:
             type: string
             default: event
             description: Type of message for EventCatalog
+        additionalProperties: false
       payload:
         type: object
         properties:
@@ -112,6 +113,8 @@ components:
                   type: number
                   format: float
                   description: Price of the item
+              additionalProperties: false
+        additionalProperties: false
 
     PaymentProcessed:
       description: 'Event triggered when a payment is successfully processed'
@@ -123,6 +126,7 @@ components:
             type: string
             default: event
             description: Type of message for EventCatalog
+        additionalProperties: false
       payload:
         type: object
         properties:
@@ -135,6 +139,7 @@ components:
           status:
             type: string
             description: Status of the payment
+        additionalProperties: false
 
     PaymentFailed:
       description: 'Event triggered when a payment fails'
@@ -146,6 +151,7 @@ components:
             type: string
             default: event
             description: Type of message for EventCatalog
+        additionalProperties: false
       payload:
         type: object
         properties:
@@ -158,6 +164,7 @@ components:
           failureReason:
             type: string
             description: Reason for the payment failure
+        additionalProperties: false
 
     OrderCancelled:
       description: 'Event received when an order is cancelled, triggering refund if payment was made'
@@ -169,6 +176,7 @@ components:
             type: string
             default: event
             description: Type of message for EventCatalog
+        additionalProperties: false
       payload:
         type: object
         properties:
@@ -178,6 +186,7 @@ components:
           reason:
             type: string
             description: Reason for the order cancellation
+        additionalProperties: false
 
     RefundInitiated:
       description: 'Event triggered when a refund is initiated due to order cancellation'
@@ -189,6 +198,7 @@ components:
             type: string
             default: event
             description: Type of message for EventCatalog
+        additionalProperties: false
       payload:
         type: object
         properties:
@@ -205,3 +215,4 @@ components:
             type: number
             format: float
             description: Amount to be refunded
+        additionalProperties: false

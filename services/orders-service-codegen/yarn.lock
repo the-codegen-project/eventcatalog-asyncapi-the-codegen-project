@@ -675,10 +675,10 @@
     "@stoplight/yaml-ast-parser" "0.0.50"
     tslib "^2.2.0"
 
-"@the-codegen-project/cli@^0.56.0":
-  version "0.56.0"
-  resolved "https://registry.yarnpkg.com/@the-codegen-project/cli/-/cli-0.56.0.tgz#c2d2c77d0e033107aa4f1f482a212530ad1bbaf8"
-  integrity sha512-yxP2uWKN3BQge6Pr+v8DzWQi3T8krKCj+nbII10gRsp65Y3rN4fpgSCJzToM85glzlcJEp28qinFYVEPWVLgUw==
+"@the-codegen-project/cli@^0.57.0":
+  version "0.57.0"
+  resolved "https://registry.yarnpkg.com/@the-codegen-project/cli/-/cli-0.57.0.tgz#5b70f07b07afe3b385abddcf23f830290aa3d38e"
+  integrity sha512-lLD98xi8jLDJWkk3F2wia7Xf69zKIePTivTAAcrlnhUnmChuGmtFCniKCjZVFkIjZ81DTqfCg8XBpaRELV81Og==
   dependencies:
     "@asyncapi/avro-schema-parser" "^3.0.24"
     "@asyncapi/modelina" "^6.0.0-next.3"
