@@ -4,41 +4,53 @@ import { connect, NatsConnection, JSONCodec, Subscription } from 'nats';
 // Type definitions based on AsyncAPI orders-service.yml specification
 // ============================================================================
 
-interface OrderItem {
-  itemId: string;
-  quantity: number;
-  price: number;
+class OrderItem {
+  constructor(
+    public itemId: string,
+    public quantity: number,
+    public price: number
+  ) {}
 }
 
 // Messages the Orders Service SENDS
-interface OrderCreated {
-  orderId: string;
-  userId: string;
-  totalAmount: number;
-  items: OrderItem[];
+class OrderCreated {
+  constructor(
+    public orderId: string,
+    public userId: string,
+    public totalAmount: number,
+    public items: OrderItem[]
+  ) {}
 }
 
-interface OrderCancelled {
-  orderId: string;
-  reason: string;
+class OrderCancelled {
+  constructor(
+    public orderId: string,
+    public reason: string
+  ) {}
 }
 
-interface OrderCompleted {
-  orderId: string;
-  completionTime: string; // ISO 8601 date-time
+class OrderCompleted {
+  constructor(
+    public orderId: string,
+    public completionTime: string // ISO 8601 date-time
+  ) {}
 }
 
 // Messages the Orders Service RECEIVES
-interface PaymentFailed {
-  paymentId: string;
-  orderId: string;
-  failureReason: string;
+class PaymentFailed {
+  constructor(
+    public paymentId: string,
+    public orderId: string,
+    public failureReason: string
+  ) {}
 }
 
-interface ShipmentDelivered {
-  orderId: string;
-  shipmentId: string;
-  deliveryTime: string; // ISO 8601 date-time
+class ShipmentDelivered {
+  constructor(
+    public orderId: string,
+    public shipmentId: string,
+    public deliveryTime: string // ISO 8601 date-time
+  ) {}
 }
 
 // ============================================================================
