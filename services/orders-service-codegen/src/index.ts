@@ -1,169 +1,30 @@
-import { connect, NatsConnection, JSONCodec, Subscription } from 'nats';
+import { connect, NatsConnection, Subscription } from 'nats';
 
-// ============================================================================
-// Type definitions based on AsyncAPI orders-service.yml specification
-// ============================================================================
+import { CHANNELS } from './channels';
+import { OrderCreated } from './models/OrderCreated';
+import { OrderCancelled } from './models/OrderCancelled';
+import { OrderCompleted } from './models/OrderCompleted';
+import { PaymentFailed } from './models/PaymentFailed';
+import { ShipmentDelivered } from './models/ShipmentDelivered';
+import {
+  sendOrderCancelled,
+  sendOrderCompleted,
+  receiveOrderCreated,
+  receivePaymentFailed,
+  receiveShipmentDelivered,
+} from './nats';
 
-interface OrderCreatedItemProps {
+export type OrderStatus = 'pending' | 'confirmed' | 'shipped' | 'delivered' | 'completed' | 'cancelled';
+export interface OrderItems {
   itemId: string;
   quantity: number;
   price: number;
 }
-
-class OrderCreatedItem {
-  private _itemId: string;
-  private _quantity: number;
-  private _price: number;
-
-  constructor(props: OrderCreatedItemProps) {
-    this._itemId = props.itemId;
-    this._quantity = props.quantity;
-    this._price = props.price;
-  }
-
-  get itemId(): string { return this._itemId; }
-  get quantity(): number { return this._quantity; }
-  get price(): number { return this._price; }
-}
-
-// Messages the Orders Service SENDS
-interface OrderCreatedProps {
+export interface Order {
   orderId: string;
   userId: string;
   totalAmount: number;
-  items: OrderCreatedItem[];
-}
-
-class OrderCreated {
-  private _orderId: string;
-  private _userId: string;
-  private _totalAmount: number;
-  private _items: OrderCreatedItem[];
-
-  constructor(props: OrderCreatedProps) {
-    this._orderId = props.orderId;
-    this._userId = props.userId;
-    this._totalAmount = props.totalAmount;
-    this._items = props.items;
-  }
-
-  get orderId(): string { return this._orderId; }
-  get userId(): string { return this._userId; }
-  get totalAmount(): number { return this._totalAmount; }
-  get items(): OrderCreatedItem[] { return this._items; }
-}
-
-interface OrderCancelledProps {
-  orderId: string;
-  reason: string;
-}
-
-class OrderCancelled {
-  private _orderId: string;
-  private _reason: string;
-
-  constructor(props: OrderCancelledProps) {
-    this._orderId = props.orderId;
-    this._reason = props.reason;
-  }
-
-  get orderId(): string { return this._orderId; }
-  get reason(): string { return this._reason; }
-}
-
-interface OrderCompletedProps {
-  orderId: string;
-  completionTime: string; // ISO 8601 date-time
-}
-
-class OrderCompleted {
-  private _orderId: string;
-  private _completionTime: string;
-
-  constructor(props: OrderCompletedProps) {
-    this._orderId = props.orderId;
-    this._completionTime = props.completionTime;
-  }
-
-  get orderId(): string { return this._orderId; }
-  get completionTime(): string { return this._completionTime; }
-}
-
-// Messages the Orders Service RECEIVES
-interface PaymentFailedProps {
-  paymentId: string;
-  orderId: string;
-  failureReason: string;
-}
-
-class PaymentFailed {
-  private _paymentId: string;
-  private _orderId: string;
-  private _failureReason: string;
-
-  constructor(props: PaymentFailedProps) {
-    this._paymentId = props.paymentId;
-    this._orderId = props.orderId;
-    this._failureReason = props.failureReason;
-  }
-
-  get paymentId(): string { return this._paymentId; }
-  get orderId(): string { return this._orderId; }
-  get failureReason(): string { return this._failureReason; }
-}
-
-interface ShipmentDeliveredProps {
-  orderId: string;
-  shipmentId: string;
-  deliveryTime: string; // ISO 8601 date-time
-}
-
-class ShipmentDelivered {
-  private _orderId: string;
-  private _shipmentId: string;
-  private _deliveryTime: string;
-
-  constructor(props: ShipmentDeliveredProps) {
-    this._orderId = props.orderId;
-    this._shipmentId = props.shipmentId;
-    this._deliveryTime = props.deliveryTime;
-  }
-
-  get orderId(): string { return this._orderId; }
-  get shipmentId(): string { return this._shipmentId; }
-  get deliveryTime(): string { return this._deliveryTime; }
-}
-
-// ============================================================================
-// Channels (keys are AsyncAPI channel IDs, values are NATS subjects)
-// ============================================================================
-const CHANNELS = {
-  // Channels this service PUBLISHES to
-  orderCancelled: 'order.cancelled',
-  orderCompleted: 'order.completed',
-
-  // Channels this service SUBSCRIBES to
-  orderCreated: 'order.created',
-  paymentFailed: 'payment.failed',
-  shipmentDelivered: 'shipment.delivered',
-} as const;
-
-// ============================================================================
-// Order state management
-// ============================================================================
-type OrderStatus = 'pending' | 'confirmed' | 'shipped' | 'delivered' | 'completed' | 'cancelled';
-
-interface OrderItem {
-  itemId: string,
-  quantity: number,
-  price: number
-}
-
-interface Order {
-  orderId: string;
-  userId: string;
-  totalAmount: number;
-  items: OrderItem[];
+  items: OrderItems[];
   status: OrderStatus;
   createdAt: Date;
 }
@@ -173,7 +34,6 @@ interface Order {
 // ============================================================================
 class OrdersService {
   private nc: NatsConnection | null = null;
-  private jc = JSONCodec();
   private subscriptions: Subscription[] = [];
   private orders: Map<string, Order> = new Map();
   private running = true;
@@ -200,54 +60,14 @@ class OrdersService {
   }
 
   // =========================================================================
-  // Publishing operations (SEND)
+  // Handlers (Business Logic)
   // =========================================================================
 
   /**
-   * sendOrderCancelled - Publishes OrderCancelled event
-   * Channel: order.cancelled
-   */
-  sendOrderCancelled(data: OrderCancelled): void {
-    if (!this.nc) throw new Error('Not connected to NATS');
-    
-    this.nc.publish(CHANNELS.orderCancelled, this.jc.encode(data));
-    console.log(`📤 [${CHANNELS.orderCancelled}] OrderCancelled sent:`, data);
-
-    // Update internal state
-    const order = this.orders.get(data.orderId);
-    if (order) {
-      order.status = 'cancelled';
-    }
-  }
-
-  /**
-   * sendOrderCompleted - Publishes OrderCompleted event
-   * Channel: order.completed
-   */
-  sendOrderCompleted(data: OrderCompleted): void {
-    if (!this.nc) throw new Error('Not connected to NATS');
-    
-    this.nc.publish(CHANNELS.orderCompleted, this.jc.encode(data));
-    console.log(`📤 OrderCompleted sent:`, data);
-
-    // Update internal state
-    const order = this.orders.get(data.orderId);
-    if (order) {
-      order.status = 'completed';
-    }
-  }
-
-  // =========================================================================
-  // Subscription handlers (RECEIVE)
-  // =========================================================================
-
-  /**
-   * receiveOrderCreated - Subscribes to OrderCreated events
-   * Channel: order.created
-   * 
+   * handleOrderCreated - Handles OrderCreated events
    * When an order is created (by another service/frontend), track it internally
    */
-  private async handleOrderCreated(data: OrderCreated): Promise<void> {
+  private handleOrderCreated = async (data: OrderCreated): Promise<void> => {
     console.log(`📥 [${CHANNELS.orderCreated}] OrderCreated received:`, {
       orderId: data.orderId,
       userId: data.userId,
@@ -272,15 +92,13 @@ class OrdersService {
     });
 
     console.log(`✅ Order ${data.orderId} registered - waiting for payment/shipment events`);
-  }
+  };
 
   /**
-   * receivePaymentFailed - Subscribes to PaymentFailed events
-   * Channel: payment.failed
-   * 
+   * handlePaymentFailed - Handles PaymentFailed events
    * When payment fails, the order should be cancelled
    */
-  private async handlePaymentFailed(data: PaymentFailed): Promise<void> {
+  private handlePaymentFailed = async (data: PaymentFailed): Promise<void> => {
     console.log(`📥 [${CHANNELS.paymentFailed}] PaymentFailed received:`, data);
 
     const order = this.orders.get(data.orderId);
@@ -296,19 +114,17 @@ class OrdersService {
 
     // Cancel the order due to payment failure
     console.log(`🚫 Cancelling order ${data.orderId} due to payment failure: ${data.failureReason}`);
-    this.sendOrderCancelled(new OrderCancelled({
+    this.publishOrderCancelled(new OrderCancelled({
       orderId: data.orderId,
       reason: `Payment failed: ${data.failureReason}`,
     }));
-  }
+  };
 
   /**
-   * receiveShipmentDelivered - Subscribes to ShipmentDelivered events
-   * Channel: shipment.delivered
-   * 
+   * handleShipmentDelivered - Handles ShipmentDelivered events
    * When shipment is delivered, the order should be marked as completed
    */
-  private async handleShipmentDelivered(data: ShipmentDelivered): Promise<void> {
+  private handleShipmentDelivered = async (data: ShipmentDelivered): Promise<void> => {
     console.log(`📥 [${CHANNELS.shipmentDelivered}] ShipmentDelivered received:`, data);
 
     const order = this.orders.get(data.orderId);
@@ -329,10 +145,38 @@ class OrdersService {
 
     // Mark order as completed
     console.log(`✅ Completing order ${data.orderId} - shipment delivered at ${data.deliveryTime}`);
-    this.sendOrderCompleted(new OrderCompleted({
+    this.publishOrderCompleted(new OrderCompleted({
       orderId: data.orderId,
       completionTime: new Date().toISOString(),
     }));
+  };
+
+  // =========================================================================
+  // Publishing wrappers (update state + send)
+  // =========================================================================
+
+  private publishOrderCancelled(data: OrderCancelled): void {
+    if (!this.nc) throw new Error('Not connected to NATS');
+    
+    sendOrderCancelled(this.nc, data);
+
+    // Update internal state
+    const order = this.orders.get(data.orderId);
+    if (order) {
+      order.status = 'cancelled';
+    }
+  }
+
+  private publishOrderCompleted(data: OrderCompleted): void {
+    if (!this.nc) throw new Error('Not connected to NATS');
+    
+    sendOrderCompleted(this.nc, data);
+
+    // Update internal state
+    const order = this.orders.get(data.orderId);
+    if (order) {
+      order.status = 'completed';
+    }
   }
 
   // =========================================================================
@@ -342,56 +186,9 @@ class OrdersService {
   async setupSubscriptions(): Promise<void> {
     if (!this.nc) throw new Error('Not connected to NATS');
 
-    // Subscribe to OrderCreated events
-    const orderCreatedSub = this.nc.subscribe(CHANNELS.orderCreated);
-    this.subscriptions.push(orderCreatedSub);
-    
-    (async () => {
-      for await (const msg of orderCreatedSub) {
-        try {
-          const data = this.jc.decode(msg.data) as OrderCreated;
-          await this.handleOrderCreated(data);
-        } catch (err) {
-          console.error(`❌ Error processing OrderCreated:`, err);
-        }
-      }
-    })();
-
-    console.log(`📬 Subscribed to: ${CHANNELS.orderCreated}`);
-
-    // Subscribe to PaymentFailed events
-    const paymentFailedSub = this.nc.subscribe(CHANNELS.paymentFailed);
-    this.subscriptions.push(paymentFailedSub);
-    
-    (async () => {
-      for await (const msg of paymentFailedSub) {
-        try {
-          const data = this.jc.decode(msg.data) as PaymentFailed;
-          await this.handlePaymentFailed(data);
-        } catch (err) {
-          console.error(`❌ Error processing PaymentFailed:`, err);
-        }
-      }
-    })();
-
-    console.log(`📬 Subscribed to: ${CHANNELS.paymentFailed}`);
-
-    // Subscribe to ShipmentDelivered events
-    const shipmentDeliveredSub = this.nc.subscribe(CHANNELS.shipmentDelivered);
-    this.subscriptions.push(shipmentDeliveredSub);
-    
-    (async () => {
-      for await (const msg of shipmentDeliveredSub) {
-        try {
-          const data = this.jc.decode(msg.data) as ShipmentDelivered;
-          await this.handleShipmentDelivered(data);
-        } catch (err) {
-          console.error(`❌ Error processing ShipmentDelivered:`, err);
-        }
-      }
-    })();
-
-    console.log(`📬 Subscribed to: ${CHANNELS.shipmentDelivered}`);
+    this.subscriptions.push(receiveOrderCreated(this.nc, this.handleOrderCreated));
+    this.subscriptions.push(receivePaymentFailed(this.nc, this.handlePaymentFailed));
+    this.subscriptions.push(receiveShipmentDelivered(this.nc, this.handleShipmentDelivered));
   }
 
   // =========================================================================
@@ -415,7 +212,7 @@ class OrdersService {
       return;
     }
 
-    this.sendOrderCancelled(new OrderCancelled({ orderId, reason }));
+    this.publishOrderCancelled(new OrderCancelled({ orderId, reason }));
   }
 
   getOrder(orderId: string): Order | undefined {
