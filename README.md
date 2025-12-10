@@ -1,2 +1,2 @@
-# cloudevent-asyncapi-the-codegen-project
+# eventcatalog-asyncapi-the-codegen-project
 One way to do it
