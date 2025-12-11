@@ -8,10 +8,6 @@ import { ShipmentDelivered } from './models/ShipmentDelivered';
 
 const jc = JSONCodec();
 
-// ============================================================================
-// Send (Publish) Functions
-// ============================================================================
-
 /**
  * sendOrderCancelled - Publishes OrderCancelled event
  * Channel: order.cancelled

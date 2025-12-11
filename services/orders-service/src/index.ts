@@ -93,11 +93,6 @@ class OrdersService {
 
     console.log(`✅ Order ${data.orderId} registered - waiting for payment/shipment events`);
   };
-
-  /**
-   * handlePaymentFailed - Handles PaymentFailed events
-   * When payment fails, the order should be cancelled
-   */
   private handlePaymentFailed = async (data: PaymentFailed): Promise<void> => {
     console.log(`📥 [${CHANNELS.paymentFailed}] PaymentFailed received:`, data);
 
@@ -119,11 +114,6 @@ class OrdersService {
       reason: `Payment failed: ${data.failureReason}`,
     }));
   };
-
-  /**
-   * handleShipmentDelivered - Handles ShipmentDelivered events
-   * When shipment is delivered, the order should be marked as completed
-   */
   private handleShipmentDelivered = async (data: ShipmentDelivered): Promise<void> => {
     console.log(`📥 [${CHANNELS.shipmentDelivered}] ShipmentDelivered received:`, data);
 
@@ -154,7 +144,6 @@ class OrdersService {
   // =========================================================================
   // Publishing wrappers (update state + send)
   // =========================================================================
-
   private publishOrderCancelled(data: OrderCancelled): void {
     if (!this.nc) throw new Error('Not connected to NATS');
     
@@ -194,7 +183,6 @@ class OrdersService {
   // =========================================================================
   // Public API for order management
   // =========================================================================
-
   cancelOrder(orderId: string, reason: string): void {
     const order = this.orders.get(orderId);
     if (!order) {
@@ -237,15 +225,6 @@ class OrdersService {
     console.log('  Processing orders and orchestrating the order lifecycle');
     console.log('═'.repeat(60));
 
-    console.log('\n📤 Publishing to channels:');
-    console.log(`   • ${CHANNELS.orderCancelled}`);
-    console.log(`   • ${CHANNELS.orderCompleted}`);
-
-    console.log('\n📥 Subscribing to channels:');
-    console.log(`   • ${CHANNELS.orderCreated}`);
-    console.log(`   • ${CHANNELS.paymentFailed}`);
-    console.log(`   • ${CHANNELS.shipmentDelivered}`);
-
     await this.setupSubscriptions();
 
     console.log('\n✅ Orders Service is running. Waiting for events...');
@@ -265,10 +244,6 @@ class OrdersService {
     }
   }
 }
-
-// ============================================================================
-// Main entry point
-// ============================================================================
 async function main() {
   const service = new OrdersService();
   const natsUrl = process.env.NATS_URL || 'nats://localhost:4222';
